@@ -93,8 +93,7 @@ async function buildMemoriesBlock(userUuid: string | null, opts?: { category?: s
  *  CONFIG / KEYS
  *  ------------------------------------------------------------------------*/
 const REAL_KEY =
-  (import.meta as any).env?.VITE_GEMINI_API_KEY ||
-  'AIzaSyDLk7vJ4R4FGepTrgkhWIVQ6_4lrkHWr1M'; // personal use is fine; ephemeral is still used below
+  (import.meta as any).env?.VITE_GEMINI_API_KEY;
 
  
 
