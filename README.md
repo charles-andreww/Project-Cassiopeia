@@ -111,6 +111,33 @@ Realtime Audio I/O with super low latency using `Gemini Live API` (`@google/gena
 
 ---
 
+### Tool Adding
+
+Cassie ChatBot:
+1. **Tool definition:**
+   ```sh
+     toolName: {
+    name: 'toolName',
+    description: 'Description of the tool',
+    parameters: {
+      type: 'object',
+      properties: {
+        Property 1: {
+          type: 'property type',
+        },
+      },
+      required: [],
+    },
+    handler: name of the handler (see below),},
+   ```
+1. **Tool Handler:**
+   ```sh
+    export const toolName = async (args: { argument: string }: Promise<FunctionResult> => {
+
+
+    return { rawResult, displayContent };}
+   ```
+---
 ## Project Structure
 
 ```
