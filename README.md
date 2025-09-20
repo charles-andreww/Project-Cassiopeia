@@ -6,6 +6,7 @@
 
 - [Features](#features)
 - [Tools](#tools)
+- [Cassie Vision](#cassie-vision-mode)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
 - [Available Scripts](#available-scripts)
@@ -29,13 +30,29 @@
 
 ---
 
-## Tools
+# Tools
 
 - Connection with Google Services; `Gmail`, `Google Calendar`, `Google Sheets`, `Google Docs`, `Drive`, `Google Meet` and `Tasks`
-- Search via `grounding with Google search`
+- Search via `Grounding with Google Search`
 - Directions with `TomTom`
 - Memory integration with `Supabase`
+- Support for more tools
   
+
+---
+
+# Cassie Vision Mode
+
+Realtime Audio I/O with super low latency using `Gemini Live API` (`@google/genai`)
+
+- Realtime tool usage:
+  Support for:
+  - Highlighting
+  - Memory (`Retreaving`, `updating`, `deleting` and `listing`)
+  - Realtime search with `Grounding with Google Search`
+  - Code execution in a Python environment
+  - Blackboard for better teaching with `Title`, `Description`, `Concept`, and `Steps to Solve`
+  - Support for more tools
 
 ---
 ## Tech Stack
