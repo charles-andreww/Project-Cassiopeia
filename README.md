@@ -5,6 +5,7 @@
 ## Table of Contents
 
 - [Features](#features)
+- [Tools](#tools)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
 - [Available Scripts](#available-scripts)
@@ -17,15 +18,26 @@
 ## Features
 
 - AI assistant powered by Google Generative AI (`@google/genai` and `@google/generative-ai`)
+- Wide range of supporting tools
 - User authentication (Google)
 - Markdown support with GFM (`react-markdown`, `remark-gfm`)
 - Real-time backend with Supabase
 - Responsive modern UI with TailwindCSS and Lucide icons
 - Routing with React Router
 - Typescript-first development
+- Realtime Audio I/O conversations with Cassie Vision mode
 
 ---
 
+## Tools
+
+- Connection with Google Services; `Gmail`, `Google Calendar`, `Google Sheets`, `Google Docs`, `Drive`, `Google Meet` and `Tasks`
+- Search via `grounding with Google search`
+- Directions with `TomTom`
+- Memory integration with `Supabase`
+  
+
+---
 ## Tech Stack
 
 - **Frontend:** [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [TypeScript](https://www.typescriptlang.org/)
