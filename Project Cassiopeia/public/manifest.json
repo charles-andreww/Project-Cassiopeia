@@ -1,0 +1,65 @@
+{
+  "name": "Project Cassiopeia",
+  "short_name": "Cassie",
+  "description": "Your intelligent AI assistant with memory, Google Workspace integration, and multimodal capabilities",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080b32",
+  "theme_color": "#080b32",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["productivity", "utilities", "education"],
+  "icons": [
+    {
+      "src": "/Project Casiopeia.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Project Casiopeia.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat with Cassie",
+      "short_name": "Chat",
+      "description": "Start a conversation with your AI assistant",
+      "url": "/chat",
+      "icons": [
+        {
+          "src": "/Project Casiopeia.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Vision",
+      "short_name": "Vision",
+      "description": "Use live camera vision mode",
+      "url": "/vision",
+      "icons": [
+        {
+          "src": "/Project Casiopeia.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "short_name": "Profile",
+      "description": "View your profile and settings",
+      "url": "/profile",
+      "icons": [
+        {
+          "src": "/Project Casiopeia.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
