@@ -46,8 +46,8 @@
 
 Realtime Audio I/O with super low latency using `Gemini Live API` (`@google/genai`)
 
-- Realtime tool usage:
-  Support for:
+### Realtime tool usage:
+Support for:
   - Highlighting
   - Memory (`Retreaving`, `updating`, `deleting` and `listing`)
   - Realtime search with `Grounding with Google Search`
@@ -90,7 +90,21 @@ Realtime Audio I/O with super low latency using `Gemini Live API` (`@google/gena
    ```
 
 3. **Environment Setup:**
-   - Add your configuration in `.env` or as required by Supabase/Google APIs.
+   - Add your configuration in `.env` like this:
+     ```sh
+     # Get your API key from https://aistudio.google.com/app/apikey and set up your google cloud project
+     VITE_GEMINI_API_KEY=
+     VITE_SUPABASE_ANON_KEY=
+     VITE_SUPABASE_URL=
+     VITE_GOOGLE_CLIENT_ID=
+     VITE_GOOGLE_CLIENT_SECRET=
+     VITE_GOOGLE_CUSTOM_SEARCH_API_KEY=
+     VITE_GOOGLE_CUSTOM_SEARCH_ENGINE_ID=
+     VITE_TOMTOM_API_KEY=
+     VITE_FIREBASE_SECRET=
+
+
+     ```
 
 4. **Start the development server:**
    ```sh
