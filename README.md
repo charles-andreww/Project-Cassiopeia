@@ -10,6 +10,7 @@
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
 - [Available Scripts](#available-scripts)
+- [Tool Adding](#tool-adding)
 - [Project Structure](#project-structure)
 - [Linting & Formatting](#linting--formatting)
 - [License](#license)
