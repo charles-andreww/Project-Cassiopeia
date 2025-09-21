@@ -132,12 +132,34 @@ Cassie ChatBot:
    ```
 2. **Tool Handler:**
    ```sh
-    export const toolName = async (args: { argument: string }: Promise<FunctionResult> => {
+    export const tool_name = async (args: { argument: string }: Promise<FunctionResult> => {
 
 
     return { rawResult, displayContent };}
    ```
+
+   
 Cassie Vision:
+1. **Tool definition:**
+```sh
+{
+        name: 'functionName',
+        description: 'Function Description',
+        parameters: { type:'object', properties: { text: { type:'string' } } }
+      },
+```
+2. **Tool Handling:**
+   ```sh
+     for (const fc of toolCall.functionCalls) {
+    try {
+      if (fc.name === 'function_name') {
+
+       [YOUR FUNCTION GOES HERE]
+   
+    responses.push({ id: fc.id, name: fc.name, response: { ok: true, count: cleaned.length } });
+        continue;
+      }
+   ```
 ---
 ## Project Structure
 
