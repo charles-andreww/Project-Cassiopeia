@@ -190,7 +190,7 @@ Project Cassiopeia/
 
 ## License
 
-MIT License (or specify your license here)
+MIT License
 
 ---
 
