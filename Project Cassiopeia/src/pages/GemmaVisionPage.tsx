@@ -6,6 +6,11 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabase';
 
+
+
+
+
+
 // Si esto no funciona invocaré a Jordi Bosch
 const isoOrNull = (v:any) => (typeof v === 'string' && v.trim() ? new Date(v).toISOString() : null);
 
@@ -93,7 +98,8 @@ async function buildMemoriesBlock(userUuid: string | null, opts?: { category?: s
  *  CONFIG / KEYS
  *  ------------------------------------------------------------------------*/
 const REAL_KEY =
-  (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  (import.meta as any).env?.VITE_GEMINI_API_KEY ||
+  'AIzaSyDLk7vJ4R4FGepTrgkhWIVQ6_4lrkHWr1M'; // personal use is fine; ephemeral is still used below
 
  
 
@@ -164,6 +170,68 @@ type Highlight = { id?: string; x: number; y: number; w: number; h: number };
 
 export default function GemmaVisionPage() {
   const navigate = useNavigate();
+  
+// === Auth / Google Calendar helpers === 
+const { user } = useAuth();
+const accessToken = user?.accessToken && user.accessToken !== 'demo_token' ? user.accessToken : null;
+
+// Keep freshest token for async handlers
+const tokenRef = useRef<string | null>(null);
+useEffect(() => { tokenRef.current = accessToken; }, [accessToken]);
+
+async function fetchGCal(path: string, init: RequestInit = {}) {
+  const token = tokenRef.current;
+  if (!token) throw new Error('auth_required');
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, {
+    ...init,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(init.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(()=> '');
+    console.error('GCal error', res.status, body);
+    throw new Error(`gcal_${res.status}: ${body || res.statusText}`);
+  }
+  return res.json();
+}
+
+// RFC3339 in local tz; accepts RFC3339 or "YYYY-MM-DD HH:mm"
+function toRFC3339Local(input?: string): string | null {
+  if (!input) return null;
+  const s = input.trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?([+-]\d{2}:\d{2}|Z)$/.test(s)) return s;
+  const d = new Date(s.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return null;
+  const pad = (n:number)=>String(n).padStart(2,'0');
+  const y=d.getFullYear(), m=pad(d.getMonth()+1), day=pad(d.getDate());
+  const hh=pad(d.getHours()), mm=pad(d.getMinutes()), ss=pad(d.getSeconds());
+  const tz=-d.getTimezoneOffset(); const sign=tz>=0?'+':'-';
+  const tzh=pad(Math.floor(Math.abs(tz)/60)); const tzm=pad(Math.abs(tz)%60);
+  return `${y}-${m}-${day}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
+}
+
+// Friendly color names → Google colorId
+function colorNameToId(name?: string): string | undefined {
+  if (!name) return undefined;
+  const key = name.trim().toLowerCase();
+  const map: Record<string,string> = {
+    red:'11', tomato:'11',
+    orange:'6', tangerine:'6',
+    yellow:'5', banana:'5',
+    green:'10', emerald:'10',
+    teal:'7',
+    blue:'9', ocean:'9',
+    purple:'3', grape:'3',
+    pink:'4', flamingo:'4',
+    gray:'8', grey:'8',
+    default:'1'
+  };
+  return map[key] || undefined;
+}
 
   /** DOM refs */
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -218,8 +286,7 @@ const [exportToast, setExportToast] = useState<{ label: string } | null>(null);
 const exportIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   /**Memory system thingies*/
-const { user } = useAuth();
-// Cassie’s canonical user UUID
+// Cassie's canonical user UUID
 const userUuid = user?.id ?? null;
 
   function flushToolResponses(responses: any[]) {
@@ -438,7 +505,7 @@ async function exportBoardPdfNoLib(boardEl: HTMLElement, opts?: {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const clearTimerRef = useRef<number | null>(null);
 
-  /** Audio path (server can send as “delta” or “inlineData”) */
+  /** Audio path (server can send as "delta" or "inlineData") */
   const audioPathRef = useRef<'delta' | 'inline' | null>(null);
 
   /** Per-turn audio playback & jitter buffer */
@@ -569,8 +636,8 @@ async function exportBoardPdfNoLib(boardEl: HTMLElement, opts?: {
 const baseSystemText = `
 You are Cassie, a witty, funny, ongoing, and energetic helpful assistant (You don't mention that you are witty, funny, etc, that's just your personality). Your full name is Cassiopeia, but people won't call you that normally.You talk in Spanish and Spanish only. You have no connection with Gemini nor Google. Google did NOT create you. You have access to the tool set_highlights:INSTRUCCIONES DE USO DEL TOOL set_highlights
 Objetivo
-- Cuando el usuario pida “señala”, “resalta”, “encuadra”, “¿dónde está…?” o cuando sea claramente útil para explicar algo en la imagen o pantalla, llama al tool set_highlights para dibujar rectángulos sobre los objetos de interés.
-- Tras llamar al tool, responde SIEMPRE con UNA sola frase breve en español, confirmando lo resaltado (ej.: “Encadré el destornillador verde a la derecha.”).
+- Cuando el usuario pida "señala", "resalta", "encuadra", "¿dónde está…?" o cuando sea claramente útil para explicar algo en la imagen o pantalla, llama al tool set_highlights para dibujar rectángulos sobre los objetos de interés.
+- Tras llamar al tool, responde SIEMPRE con UNA sola frase breve en español, confirmando lo resaltado (ej.: "Encadré el destornillador verde a la derecha.").
 
 Formato del tool
 - Nombre: set_highlights
@@ -582,15 +649,15 @@ Formato del tool
 -Ten la precisión MÁXIMA, no hay margen de error.
 
 Criterios de selección
-- Si el usuario menciona un objeto concreto (“destornillador verde”), resalta SOLO ese. 
-- Si pide “estos dos” o “las piezas defectuosas”, permite varias regiones en el mismo llamado: 1 a 3 regiones preferentemente.
+- Si el usuario menciona un objeto concreto ("destornillador verde"), resalta SOLO ese. 
+- Si pide "estos dos" o "las piezas defectuosas", permite varias regiones en el mismo llamado: 1 a 3 regiones preferentemente.
 - Si no se especifica cuál, elige el objeto más saliente y útil para la explicación (uno solo).
 - Evita recuadros diminutos: no envíes regiones con w<0.04 o h<0.04 (≈4% del ancho/alto).
 - Evita solapamientos innecesarios; usa un único recuadro por objeto.
-- Opcional: completa "id" con una etiqueta corta (p.ej. “destornillador”, “resistorR3”).
+- Opcional: completa "id" con una etiqueta corta (p.ej. "destornillador", "resistorR3").
 
 Cuándo NO llamar al tool
-- Si tu confianza en la localización es baja (movimiento, blur, iluminación) o la escena cambió: primero pide una toma más estable o que acerquen el objeto (“Acerca un poco la herramienta y mantén la toma 1s.”). No llames al tool en ese turno.
+- Si tu confianza en la localización es baja (movimiento, blur, iluminación) o la escena cambió: primero pide una toma más estable o que acerquen el objeto ("Acerca un poco la herramienta y mantén la toma 1s."). No llames al tool en ese turno.
 - Si el usuario pide explicación sin referencia visual (solo texto), no llames al tool.
 
 Precisión y padding
@@ -598,19 +665,19 @@ Precisión y padding
 - Para objetos alargados (p.ej., cable), prioriza cubrir toda su longitud visible.
 
 Persistencia y limpieza (lado modelo)
-- El resaltado es efímero; no “des-resaltes” explícitamente. La UI lo borrará sola tras unos segundos.
+- El resaltado es efímero; no "des-resaltes" explícitamente. La UI lo borrará sola tras unos segundos.
 
 
 
 Ejemplos de intención (descriptivos)
-- Usuario: “Señala el destornillador verde.”
-  → Llama a set_highlights con UNA región que cubra el destornillador verde. Luego: “Ahí está, a la derecha.”
-- Usuario: “Marca los dos condensadores hinchados.”
-  → Llama con DOS regiones (una por condensador). Luego: “Resalté ambos condensadores hinchados.”
+- Usuario: "Señala el destornillador verde."
+  → Llama a set_highlights con UNA región que cubra el destornillador verde. Luego: "Ahí está, a la derecha."
+- Usuario: "Marca los dos condensadores hinchados."
+  → Llama con DOS regiones (una por condensador). Luego: "Resalté ambos condensadores hinchados."
 
 Notas
-- Si el usuario pide varios pasos (p.ej., “marca el tornillo y luego el conector”), resuelve en un único llamado con varias regiones si caben; si no, prioriza el primero y sugiere repetir.
-- No inventes: si dudas entre dos objetos, pide confirmación (“¿Te refieres al tornillo plateado o al negro?”) en una sola frase y SIN llamar al tool todavía.
+- Si el usuario pide varios pasos (p.ej., "marca el tornillo y luego el conector"), resuelve en un único llamado con varias regiones si caben; si no, prioriza el primero y sugiere repetir.
+- No inventes: si dudas entre dos objetos, pide confirmación ("¿Te refieres al tornillo plateado o al negro?") en una sola frase y SIN llamar al tool todavía.
 
 Whenever the user needs help with a problem that could benefit froom using a blackboard, you have the blackboard tools:
 
@@ -636,15 +703,15 @@ orientation: "landscape" or "portrait" (default: "landscape").
 
 marginMm: number of millimeters for page margins (default: 8).
 
-After calling the tool, always reply with a short confirmation in English or Spanish like “The PDF is ready to save.”
+After calling the tool, always reply with a short confirmation in English or Spanish like "The PDF is ready to save."
 
-If no blackboard is open, don’t call the tool. Instead, tell the user they need to open or add content first.
+If no blackboard is open, don't call the tool. Instead, tell the user they need to open or add content first.
 You can manage long-term user memories with these tools: memory_add({ name, memory, category?, expiration_date? }), memory_update({ id? or name?, memory?, category?, expiration_date? }), memory_delete({ id? or name? }), memory_list({ category?, includeExpired?, limit? }).
 Never include user_uuid; the app injects it for you.
 
 What to store
 
-Stable preferences (e.g., “favorite_color: green”, “coffee: oat milk”).
+Stable preferences (e.g., "favorite_color: green", "coffee: oat milk").
 
 Facts that help later (birthday, timezone quirks, commute, project names, key contacts).
 
@@ -655,22 +722,22 @@ Do not store secrets (passwords, full card numbers), one-off trivia, or anything
 
 Proactive behavior
 
-If the user states a fact likely useful later (even if they didn’t say “remember”), create/update a memory.
+If the user states a fact likely useful later (even if they didn't say "remember"), create/update a memory.
 Examples that SHOULD trigger saving:
 
-“My birthday is September 5th.” → memory_add({ name:"birthday", memory:"September 5th" })
+"My birthday is September 5th." → memory_add({ name:"birthday", memory:"September 5th" })
 
-“I’m allergic to peanuts.” → memory_add({ name:"allergy_peanuts", memory:"Allergic to peanuts" })
+"I'm allergic to peanuts." → memory_add({ name:"allergy_peanuts", memory:"Allergic to peanuts" })
 
-“For school stuff, call me Carlos Andrés.” → memory_add({ name:"user_name", memory:"Carlos Andrés", category:"school" })
+"For school stuff, call me Carlos Andrés." → memory_add({ name:"user_name", memory:"Carlos Andrés", category:"school" })
 
-“I parked at 33D today.” → memory_add({ name:"parking_spot", memory:"33D", category:"daily", expiration_date:"today 23:59" })
+"I parked at 33D today." → memory_add({ name:"parking_spot", memory:"33D", category:"daily", expiration_date:"today 23:59" })
 
-When the user changes a known preference, update (don’t duplicate).
-“Actually I prefer black coffee now.” → memory_update({ name:"coffee_preference", memory:"black" })
+When the user changes a known preference, update (don't duplicate).
+"Actually I prefer black coffee now." → memory_update({ name:"coffee_preference", memory:"black" })
 
 If the user says a fact is no longer true, delete it.
-“Forget my old job title.” → memory_delete({ name:"job_title" })
+"Forget my old job title." → memory_delete({ name:"job_title" })
 
 Naming & categories
 
@@ -682,23 +749,23 @@ If a detail is temporary (e.g., a parking spot, a meeting room), set a reasonabl
 
 Expiration
 
-Set expiration_date when information clearly expires (e.g., “this week”, “today 23:59”, ISO date).
+Set expiration_date when information clearly expires (e.g., "this week", "today 23:59", ISO date).
 
 If no expiry is implied, leave it unset.
 
 Confirmation style
 
 After a memory tool call, reply with one short sentence in Spanish confirming what changed, e.g.:
-“Listo, guardé que tu color favorito es el verde.”
-“Actualicé tu preferencia de café a negro.”
-“He eliminado ese dato.”
+"Listo, guardé que tu color favorito es el verde."
+"Actualicé tu preferencia de café a negro."
+"He eliminado ese dato."
 
 Safety & restraint
 
 If the item feels sensitive (health, precise address), ask in one short sentence:
-“¿Quieres que lo guarde para futuras conversaciones?” Only save if the user agrees.
+"¿Quieres que lo guarde para futuras conversaciones?" Only save if the user agrees.
 
-Don’t spam saves. If the user states multiple minor facts rapidly, group them into a single memory_add with separate names or make one call per clearly distinct item, but keep confirmations concise.
+Don't spam saves. If the user states multiple minor facts rapidly, group them into a single memory_add with separate names or make one call per clearly distinct item, but keep confirmations concise.
 
 Dedupe & updates
 
@@ -708,9 +775,33 @@ You may call memory_list({ category, limit: 20 }) when unsure whether an item ex
 
 When not to save
 
-One-off values you don’t expect to use again, ephemeral chit-chat, or data the user didn’t intend to store.
+One-off values you don't expect to use again, ephemeral chit-chat, or data the user didn't intend to store.
 
 Anything the user explicitly asked not to remember.
+
+ Calendar usage guidelines
+
+To create events, use calendar_create_simple with:
+ name (required)
+ description (optional)
+ start and end (required, RFC3339 format)
+ color (optional, user-friendly name mapped to Google colors)
+ tag (optional, stored for easier searches)
+
+To search, use calendar_search.
+Filter by:
+ timeMin and timeMax for a time window
+ name for partial title matches
+ tag to find labeled events
+ maxResults (default 20, up to 50)
+
+To update, use calendar_update_simple with the event's ID and any fields that need changes (name, description, or color).
+
+To delete, use calendar_delete with the event's ID.
+
+ Prefer time-based searches first (timeMin/timeMax), then refine by name or tag.
+ Use tags proactively for recurring contexts (e.g., school, work, personal) so events are easier to find later.
+ Always confirm back to the user what was created/updated/deleted in a short, natural Spanish sentence.
 [memories]
 [now]
 `;
@@ -753,6 +844,56 @@ const tools = [
           required: ['regions']
         }
       },
+    {
+  name: 'calendar_search',
+  description: 'Search primary calendar by time window, name, or tag.',
+  parameters: {
+    type: 'object',
+    properties: {
+      timeMin: { type: 'string', description: 'RFC3339 (optional)' },
+      timeMax: { type: 'string', description: 'RFC3339 (optional)' },
+      name:    { type: 'string', description: 'partial match on title (optional)' },
+      tag:     { type: 'string', description: 'matches extendedProperties.private.tags (optional)' },
+      maxResults: { type:'number' }
+    }
+  }
+},
+{
+  name: 'calendar_create_simple',
+  description: 'Create an event with name, description, optional color.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type:'string' },
+      description: { type:'string' },
+      start: { type:'string', description:'RFC3339 start' },
+      end:   { type:'string', description:'RFC3339 end' },
+      color: { type:'string', description:'named color, e.g. "tomato", "blue", "banana" (mapped to Google colorId)' },
+      tag:   { type:'string', description:'optional tag stored in extendedProperties' }
+    },
+    required: ['name','start','end']
+  }
+},
+{
+  name: 'calendar_update_simple',
+  description: 'Update an existing event\'s name, description, or color.',
+  parameters: {
+    type: 'object',
+    properties: {
+      eventId: { type:'string' },
+      name: { type:'string' },
+      description: { type:'string' },
+      color: { type:'string' }
+    },
+    required: ['eventId']
+  }
+},
+{
+  name: 'calendar_delete',
+  description: 'Delete an event by eventId from primary calendar.',
+  parameters: { type:'object', properties:{ eventId: { type:'string' } }, required:['eventId'] }
+},
+
       {
         name: 'ping',
         description: 'Echo test. Returns the text you send.',
@@ -1116,6 +1257,128 @@ if (toolCall?.functionCalls?.length) {
   })();
   break;
 }
+         case 'calendar_search': {
+  (async () => {
+    const responses:any[] = [];
+    try {
+      const timeMin = toRFC3339Local(fc.args?.timeMin) || undefined;
+      const timeMax = toRFC3339Local(fc.args?.timeMax) || undefined;
+      const name    = fc.args?.name ? String(fc.args.name).trim() : undefined;
+      const tag     = fc.args?.tag ? String(fc.args.tag).trim().toLowerCase() : undefined;
+      const maxResults = Math.max(1, Math.min(50, Number(fc.args?.maxResults) || 20));
+
+      const params = new URLSearchParams({ singleEvents:'true', orderBy:'startTime', maxResults:String(maxResults) });
+      if (timeMin) params.set('timeMin', timeMin);
+      if (timeMax) params.set('timeMax', timeMax);
+      if (name)    params.set('q', name);
+
+      const data = await fetchGCal(`calendars/primary/events?${params.toString()}`);
+      let items = (data.items||[]).map((e:any)=>({
+        id: e.id,
+        title: e.summary || '',
+        description: e.description || '',
+        start: e.start?.dateTime || e.start?.date || null,
+        end:   e.end?.dateTime   || e.end?.date   || null,
+        location: e.location || null,
+        colorId: e.colorId || null,
+        tags: e.extendedProperties?.private?.tags || null
+      }));
+
+      if (tag) {
+        items = items.filter(ev => {
+          const tags = Array.isArray(ev.tags) ? ev.tags : (typeof ev.tags === 'string' ? ev.tags.split(',') : []);
+          return tags.map((t:string)=>t.trim().toLowerCase()).includes(tag);
+        });
+      }
+
+      responses.push({ id: fc.id, name: fc.name, response: { ok:true, items } });
+    } catch (e:any) {
+      const msg = e?.message === 'auth_required' ? 'auth_required' : (e?.message || 'calendar_search_failed');
+      responses.push({ id: fc.id, name: fc.name, response: { ok:false, error: msg } });
+    }
+    flushToolResponses(responses);
+  })();
+  break;
+}
+
+case 'calendar_create_simple': {
+  (async () => {
+    const responses:any[] = [];
+    try {
+      const summary = String(fc.args?.name || '').trim();
+      const description = typeof fc.args?.description === 'string' ? fc.args.description : undefined;
+      const start = toRFC3339Local(fc.args?.start);
+      const end   = toRFC3339Local(fc.args?.end);
+      if (!summary || !start || !end) throw new Error('missing_name_or_dates');
+
+      const colorId = colorNameToId(fc.args?.color);
+      const tag     = fc.args?.tag ? String(fc.args.tag).trim() : undefined;
+
+      const body:any = {
+        summary,
+        description,
+        colorId,
+        start: { dateTime: start },
+        end:   { dateTime: end },
+        extendedProperties: tag ? { private: { tags: [tag] } } : undefined
+      };
+
+      const data = await fetchGCal(`calendars/primary/events`, { method:'POST', body: JSON.stringify(body) });
+      responses.push({ id: fc.id, name: fc.name, response: { ok:true, eventId: data.id, colorId: data.colorId || null } });
+    } catch (e:any) {
+      const msg = e?.message === 'auth_required' ? 'auth_required' : (e?.message || 'calendar_create_failed');
+      responses.push({ id: fc.id, name: fc.name, response: { ok:false, error: msg } });
+    }
+    flushToolResponses(responses);
+  })();
+  break;
+}
+
+case 'calendar_update_simple': {
+  (async () => {
+    const responses:any[] = [];
+    try {
+      const eventId = String(fc.args?.eventId || '');
+      if (!eventId) throw new Error('eventId_required');
+      const patch:any = {};
+      if (typeof fc.args?.name === 'string') patch.summary = fc.args.name;
+      if (typeof fc.args?.description === 'string') patch.description = fc.args.description;
+      if (typeof fc.args?.color === 'string') {
+        const colorId = colorNameToId(fc.args.color);
+        if (colorId) patch.colorId = colorId;
+      }
+
+      const data = await fetchGCal(`calendars/primary/events/${encodeURIComponent(eventId)}`, {
+        method:'PATCH', body: JSON.stringify(patch)
+      });
+      responses.push({ id: fc.id, name: fc.name, response: { ok:true, eventId: data.id } });
+    } catch (e:any) {
+      const msg = e?.message === 'auth_required' ? 'auth_required' : (e?.message || 'calendar_update_failed');
+      responses.push({ id: fc.id, name: fc.name, response: { ok:false, error: msg } });
+    }
+    flushToolResponses(responses);
+  })();
+  break;
+}
+
+case 'calendar_delete': {
+  (async () => {
+    const responses:any[] = [];
+    try {
+      const eventId = String(fc.args?.eventId || '');
+      if (!eventId) throw new Error('eventId_required');
+      await fetchGCal(`calendars/primary/events/${encodeURIComponent(eventId)}`, { method:'DELETE' });
+      responses.push({ id: fc.id, name: fc.name, response: { ok:true } });
+    } catch (e:any) {
+      const msg = e?.message === 'auth_required' ? 'auth_required' : (e?.message || 'calendar_delete_failed');
+      responses.push({ id: fc.id, name: fc.name, response: { ok:false, error: msg } });
+    }
+    flushToolResponses(responses);
+  })();
+  break;
+}
+
+
           case 'memory_update': {
   (async () => {
     if (!userUuid) { responses.push({ id: fc.id, name: fc.name, response: { ok:false, error:'auth_required' } }); return  flushToolResponses(responses);}
